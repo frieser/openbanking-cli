@@ -3,7 +3,7 @@ module github.com/frieser/openbanking
 go 1.16
 
 require (
-	github.com/frieser/nordigen-go-lib v0.0.1
+	github.com/frieser/nordigen-go-lib/v2 v2.0.1
 	github.com/google/uuid v1.2.0
 	github.com/manifoldco/promptui v0.8.0
 	github.com/olekukonko/tablewriter v0.0.5

@@ -2,7 +2,7 @@ package internal
 
 import (
 	"fmt"
-	"github.com/frieser/nordigen-go-lib"
+	nordigen "github.com/frieser/nordigen-go-lib/v2"
 )
 
 type Country struct {

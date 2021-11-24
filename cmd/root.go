@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/frieser/nordigen-go-lib"
+	nordigen "github.com/frieser/nordigen-go-lib/v2"
 	"github.com/frieser/openbanking/console"
 	"github.com/frieser/openbanking/internal"
 	"github.com/google/uuid"
@@ -38,7 +38,8 @@ func init() {
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(accountsCmd)
 	rootCmd.AddCommand(txnsCmd)
-	rootCmd.PersistentFlags().StringP("token", "t", "", "Nordigen Token")
+	rootCmd.PersistentFlags().StringP("secretId", "i", "", "Nordigen secretId")
+	rootCmd.PersistentFlags().StringP("secretKey", "k", "", "Nordigen secretKey")
 
 	err := viper.BindPFlags(rootCmd.PersistentFlags())
 
@@ -55,8 +56,11 @@ func Execute() {
 }
 
 func interactive() {
-	prompt := promptui.Prompt{Label: "Nordigen Token", Mask: '*'}
-	nordigentoken, err := prompt.Run()
+	prompt := promptui.Prompt{Label: "Nordigen Secret Id", Mask: '*'}
+	nordigenSecretId, err := prompt.Run()
+
+	prompt = promptui.Prompt{Label: "Nordigen Secret Key", Mask: '*'}
+	nordigensecretKey, err := prompt.Run()
 
 	if err != nil {
 		panic(err)
@@ -67,7 +71,7 @@ func interactive() {
 	if err != nil {
 		panic(err)
 	}
-	cli := nordigen.NewClient(nordigentoken)
+	cli, err := nordigen.NewClient(nordigenSecretId, nordigensecretKey)
 	b, err := chooseBank(cli, c)
 
 	if err != nil {
@@ -80,7 +84,7 @@ func interactive() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a, err := chooseAccount(cli, b, endUserId)
+	a, err := chooseAccount(cli, b)
 
 	if err != nil {
 		panic(err)
@@ -92,7 +96,7 @@ func interactive() {
 	}
 }
 
-func chooseAccountAction(cli nordigen.Client, a internal.Account) error {
+func chooseAccountAction(cli *nordigen.Client, a internal.Account) error {
 	prompt := promptui.Select{
 		Label: "What do you want to do?",
 		Items: []string{
@@ -170,7 +174,7 @@ func chooseAccountAction(cli nordigen.Client, a internal.Account) error {
 	return nil
 }
 
-func ShowTxnTable(cli nordigen.Client, accountId string) error {
+func ShowTxnTable(cli *nordigen.Client, accountId string) error {
 	txns, err := cli.GetAccountTransactions(accountId)
 
 	if err != nil {
@@ -217,9 +221,9 @@ func ShowTxnTable(cli nordigen.Client, accountId string) error {
 	return nil
 }
 
-func chooseAccount(cli nordigen.Client, b internal.Bank, endUserId string) (internal.Account, error) {
+func chooseAccount(cli *nordigen.Client, b internal.Bank) (internal.Account, error) {
 	t := console.Task("Waiting for authorization...")
-	r, err := GetAuthorization(cli, b.Id, endUserId)
+	r, err := GetAuthorization(cli, b.Id)
 
 	if err != nil {
 		t.Fail("Fail to get authorization")
@@ -259,7 +263,7 @@ func chooseAccount(cli nordigen.Client, b internal.Bank, endUserId string) (inte
 	return accounts[selectedAccount], err
 }
 
-func Accounts(cli nordigen.Client, r nordigen.Requisition) ([]internal.Account, error) {
+func Accounts(cli *nordigen.Client, r nordigen.Requisition) ([]internal.Account, error) {
 	accounts := make([]internal.Account, 0)
 
 	for _, account := range r.Accounts {
@@ -289,27 +293,18 @@ func Accounts(cli nordigen.Client, r nordigen.Requisition) ([]internal.Account, 
 	return accounts, nil
 }
 
-func GetAuthorization(cli nordigen.Client, bankId string, endUserId string) (nordigen.Requisition, error) {
+func GetAuthorization(cli *nordigen.Client, bankId string) (nordigen.Requisition, error) {
 	requisition := nordigen.Requisition{
-		Redirect:  "http://localhost" + redirect,
-		Reference: strconv.Itoa(int(time.Now().Unix())),
-		EnduserId: endUserId,
-		Agreements: []string{
-
-		},
+		Redirect:      "http://localhost" + redirect,
+		Reference:     strconv.Itoa(int(time.Now().Unix())),
+		InstitutionId: bankId,
 	}
 	r, err := cli.CreateRequisition(requisition)
 
 	if err != nil {
 		return nordigen.Requisition{}, err
 	}
-	rr, err := cli.CreateRequisitionLink(r.Id, nordigen.RequisitionLinkRequest{
-		AspspsId: bankId})
-
-	if err != nil {
-		return nordigen.Requisition{}, err
-	}
-	go internal.OpenBrowser(rr.Initiate)
+	go internal.OpenBrowser(r.Link)
 
 	ch := make(chan bool, 1)
 
@@ -317,6 +312,8 @@ func GetAuthorization(cli nordigen.Client, bankId string, endUserId string) (nor
 
 	<-ch
 
+	// issue in the api, see Status requisition definition
+	//for r.Status.Short == "CR" {
 	for r.Status == "CR" {
 		r, err = cli.GetRequisition(r.Id)
 
@@ -330,7 +327,7 @@ func GetAuthorization(cli nordigen.Client, bankId string, endUserId string) (nor
 	return r, nil
 }
 
-func chooseMaxHistoricDays(cli nordigen.Client, b internal.Bank, endUserId string) error {
+func chooseMaxHistoricDays(cli *nordigen.Client, b internal.Bank, endUserId string) error {
 	promptDays := promptui.Prompt{
 		Label:   fmt.Sprintf("Select Max historic days (Default: %d)", b.TransactionTotalDays),
 		Default: strconv.Itoa(b.TransactionTotalDays),
@@ -363,8 +360,8 @@ func chooseMaxHistoricDays(cli nordigen.Client, b internal.Bank, endUserId strin
 	return nil
 }
 
-func chooseBank(cli nordigen.Client, c internal.Country) (internal.Bank, error) {
-	countryBanks, err := cli.ListAspsps(c.Code)
+func chooseBank(cli *nordigen.Client, c internal.Country) (internal.Bank, error) {
+	countryBanks, err := cli.ListInstitutions(c.Code)
 
 	if err != nil {
 		panic(err)

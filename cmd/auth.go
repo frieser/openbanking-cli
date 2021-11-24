@@ -2,9 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/frieser/nordigen-go-lib"
+	nordigen "github.com/frieser/nordigen-go-lib/v2"
 	"github.com/frieser/openbanking/console"
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
@@ -16,14 +15,17 @@ var authCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		bankId := viper.GetString("bankId")
-		token := viper.GetString("token")
+		secretId := viper.GetString("secretId")
+		secretKey := viper.GetString("secretKey")
 
-		cli := nordigen.NewClient(token)
+		cli, err := nordigen.NewClient(secretId, secretKey)
 
-		endUserId := uuid.NewString()
+		if err != nil {
+			os.Exit(1)
+		}
 		t := console.Task("Getting Credentials")
 
-		r, err := GetAuthorization(cli, bankId, endUserId)
+		r, err := GetAuthorization(cli, bankId)
 
 		if err != nil {
 			t.Fail(err)
@@ -36,8 +38,8 @@ var authCmd = &cobra.Command{
 
 		Now you can run the rest of commands like:
 
-		openbanking-cli accounts -b {YOUR_BANK_ID} -r %s -t %s
-		`, r.Id, r.Id, token))
+		openbanking-cli accounts -b {YOUR_BANK_ID} -r %s -i %s -k %s
+		`, r.Id, r.Id, secretId, secretKey))
 	},
 }
 

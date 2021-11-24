@@ -2,9 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/frieser/nordigen-go-lib"
+	nordigen "github.com/frieser/nordigen-go-lib/v2"
 	"github.com/frieser/openbanking/console"
-	"github.com/google/uuid"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,18 +16,21 @@ var accountsCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		bankId := viper.GetString("bankId")
-		token := viper.GetString("token")
+		secretId := viper.GetString("secretId")
+		secretKey := viper.GetString("secretKey")
 		requisitionId := viper.GetString("requisitionId")
 
 		t := console.Task("Listing accounts...")
-		cli := nordigen.NewClient(token)
+		cli, err := nordigen.NewClient(secretId, secretKey)
 
+		if err != nil {
+			t.Fail(err)
+			os.Exit(1)
+		}
 		var r nordigen.Requisition
-		var err error
 
 		if requisitionId == "" {
-			endUserId := uuid.NewString()
-			r, err = GetAuthorization(cli, bankId, endUserId)
+			r, err = GetAuthorization(cli, bankId)
 
 			if err != nil {
 				t.Fail(err)
@@ -70,13 +72,13 @@ var accountsCmd = &cobra.Command{
 			console.Section(fmt.Sprintf(`
 			To list an account transactions use for example: 
 	
-			openbanking-cli txns -a %s -t %s
+			openbanking-cli txns -a %s -s %s -a %s
 
 			Or to export them:
 
-			openbanking-cli txns export -a %s -t %s -f ofx
+			openbanking-cli txns export -a %s -i %s -k %s -f ofx
 	
-		`, accounts[0].Id, token, accounts[0].Id, token))
+		`, accounts[0].Id, secretId, secretKey, accounts[0].Id, secretId, secretKey))
 		}
 
 	},

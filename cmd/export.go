@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	nordigen "github.com/frieser/nordigen-go-lib/v2"
 	"github.com/frieser/openbanking/console"
-	"github.com/frieser/nordigen-go-lib"
 	"github.com/frieser/openbanking/ofx"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -21,7 +21,8 @@ var exportCmd = &cobra.Command{
 	Short: "",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		token := viper.GetString("token")
+		secretId := viper.GetString("secretId")
+		secretKey := viper.GetString("secretKey")
 		accountId := viper.GetString("account")
 		output := viper.GetString("output")
 		format := viper.GetString("format")
@@ -33,9 +34,12 @@ var exportCmd = &cobra.Command{
 				format)
 		}
 
-		cli := nordigen.NewClient(token)
+		cli, err := nordigen.NewClient(secretId, secretKey)
 
-		err := exportTxns(cli, accountId, output, format, pretty)
+		if err != nil {
+			os.Exit(1)
+		}
+		err = exportTxns(cli, accountId, output, format, pretty)
 
 		if err != nil {
 			os.Exit(1)
@@ -43,7 +47,7 @@ var exportCmd = &cobra.Command{
 	},
 }
 
-func exportTxns(cli nordigen.Client, accountId, output, format string, pretty bool) error {
+func exportTxns(cli *nordigen.Client, accountId, output, format string, pretty bool) error {
 	t := console.Task(fmt.Sprintf("Export %s account txns to %s format in %s", accountId, format, output))
 
 	txns, err := cli.GetAccountTransactions(accountId)

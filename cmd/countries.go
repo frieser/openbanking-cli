@@ -24,7 +24,7 @@ var countryCmd = &cobra.Command{
 		console.Section(`
 		To list all the banks in a country use:
 
-		openbanking-cli banks -c {COUNTRY_CODE} -t {NORDIGEN_TOKEN}
+		openbanking-cli banks -c {COUNTRY_CODE} -s {NORDIGEN_SECRET_ID} -a {NORDIGEN_ACCESS_ID}
 		`)
 	},
 }

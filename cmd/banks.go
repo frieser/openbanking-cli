@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	nordigen "github.com/frieser/nordigen-go-lib/v2"
 	"github.com/frieser/openbanking/console"
 	"github.com/frieser/openbanking/internal"
-	"github.com/frieser/nordigen-go-lib"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,15 +17,20 @@ var banksCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		country := viper.GetString("country")
-		token := viper.GetString("token")
+		secretId := viper.GetString("secretId")
+		secretKey := viper.GetString("secretKey")
 
 		t := console.Task(fmt.Sprintf("Listing available %s banks", country))
 
 		for _, c := range internal.Countries {
 			if c.Code == country {
+				cli, err := nordigen.NewClient(secretId, secretKey)
 
-				cli := nordigen.NewClient(token)
-				banks, err := cli.ListAspsps(c.Code)
+				if err != nil {
+					t.Fail(err)
+					os.Exit(1)
+				}
+				banks, err := cli.ListInstitutions(c.Code)
 
 				if err != nil {
 					t.Fail(err)
